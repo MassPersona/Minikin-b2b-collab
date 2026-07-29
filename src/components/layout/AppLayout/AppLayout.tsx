@@ -21,32 +21,29 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 768);
   const location = useLocation();
 
   const toggleMenu = useCallback(() => {
-    // On mobile, toggle drawer. On desktop, toggle collapse.
-    if (window.innerWidth <= 768) {
-      setIsMobileOpen((prev) => !prev);
-    } else {
-      setIsCollapsed((prev) => !prev);
-    }
+    setIsSidebarOpen((prev) => !prev);
   }, []);
 
-  const closeMobile = useCallback(() => setIsMobileOpen(false), []);
+  const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
 
-  // Close mobile sidebar when route changes
+  // Close sidebar on mobile when route changes
   const currentPath = location.pathname;
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    closeMobile();
-  }, [currentPath, closeMobile]);
+    if (window.innerWidth <= 768) {
+      closeSidebar();
+    }
+  }, [currentPath, closeSidebar]);
 
-  // Close mobile sidebar with Escape key
+  // Close sidebar with Escape key on mobile
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setIsMobileOpen(false);
+      if (e.key === 'Escape' && window.innerWidth <= 768) {
+        setIsSidebarOpen(false);
+      }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -55,11 +52,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pageTitle = getPageTitle(location.pathname);
 
   return (
-    <div className={`app-layout ${isCollapsed ? 'app-layout--collapsed' : ''}`}>
+    <div className={`app-layout ${isSidebarOpen ? 'app-layout--sidebar-open' : ''}`}>
       <Sidebar
-        isCollapsed={isCollapsed}
-        isMobileOpen={isMobileOpen}
-        onClose={closeMobile}
+        isOpen={isSidebarOpen}
+        onClose={closeSidebar}
       />
       <div className="app-layout__body">
         <AppHeader pageTitle={pageTitle} onMenuToggle={toggleMenu} />

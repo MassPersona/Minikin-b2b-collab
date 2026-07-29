@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import LogoSvg from '../../../assets/Minikin-Logo-1-1.svg';
 import './Sidebar.css';
 
 // Inline SVG icon for Campaigns
@@ -12,16 +13,15 @@ function CampaignsIcon() {
 }
 
 interface SidebarProps {
-  isCollapsed: boolean;
-  isMobileOpen: boolean;
+  isOpen: boolean;
   onClose: () => void;
 }
 
-export function Sidebar({ isCollapsed, isMobileOpen, onClose }: SidebarProps) {
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Mobile overlay */}
-      {isMobileOpen && (
+      {isOpen && (
         <div
           className="sidebar-overlay"
           onClick={onClose}
@@ -30,16 +30,15 @@ export function Sidebar({ isCollapsed, isMobileOpen, onClose }: SidebarProps) {
       )}
 
       <aside
-        className={`sidebar ${isCollapsed ? 'sidebar--collapsed' : ''} ${isMobileOpen ? 'sidebar--mobile-open' : ''}`}
+        className={`sidebar ${isOpen ? 'sidebar--open' : ''}`}
         aria-label="Application navigation"
       >
         <div className="sidebar__logo">
-          <span className="logo-mark">M</span>
-          {!isCollapsed && <span className="logo-text">Minikin</span>}
+          <img src={LogoSvg} alt="Minikin" style={{ height: 28, width: 'auto', maxWidth: '100%', display: 'block', flexShrink: 0 }} />
         </div>
 
         <nav className="sidebar__nav">
-          <p className={`sidebar__section-label ${isCollapsed ? 'sr-only' : ''}`}>
+          <p className="sidebar__section-label">
             Navigation
           </p>
           <NavLink
@@ -48,10 +47,10 @@ export function Sidebar({ isCollapsed, isMobileOpen, onClose }: SidebarProps) {
               `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
             }
             title="Campaigns"
-            onClick={() => { if (isMobileOpen) onClose(); }}
+            onClick={onClose}
           >
             <span className="sidebar__link-icon"><CampaignsIcon /></span>
-            {!isCollapsed && <span className="sidebar__link-label">Campaigns</span>}
+            <span className="sidebar__link-label">Campaigns</span>
           </NavLink>
         </nav>
       </aside>

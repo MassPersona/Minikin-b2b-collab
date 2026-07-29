@@ -2,7 +2,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  left: var(--sidebar-width);
+  left: 0;
   height: var(--header-height);
   z-index: 150;
   background-color: var(--color-white);
@@ -15,8 +15,8 @@
   transition: left var(--transition-slow);
 }
 
-.app-header--collapsed {
-  left: var(--sidebar-collapsed-width);
+.app-layout--sidebar-open .app-header {
+  left: var(--sidebar-width);
 }
 
 .app-header__menu-btn {
@@ -81,7 +81,7 @@
 }
 
 @media (max-width: 768px) {
-  .app-header {
+  .app-layout--sidebar-open .app-header {
     left: 0;
   }
 
