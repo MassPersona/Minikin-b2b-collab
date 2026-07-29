@@ -1,0 +1,28 @@
+.status-badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.status-badge--draft {
+  background-color: var(--color-status-draft-bg);
+  color: var(--color-status-draft-text);
+}
+
+.status-badge--pending-review {
+  background-color: var(--color-status-pending-bg);
+  color: var(--color-status-pending-text);
+}
+
+.status-badge--active {
+  background-color: var(--color-status-active-bg);
+  color: var(--color-status-active-text);
+}
+
+.status-badge--rejected {
+  background-color: var(--color-status-rejected-bg);
+  color: var(--color-status-rejected-text);
+}

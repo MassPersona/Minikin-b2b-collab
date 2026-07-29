@@ -46,3 +46,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Responsive helpers */
+.hide-on-mobile { display: block; }
+.show-on-mobile { display: none; }
+
+@media (max-width: 768px) {
+  .hide-on-mobile { display: none; }
+  .show-on-mobile { display: block; }
+}

@@ -1,6 +1,14 @@
 export type CampaignStatus = 'draft' | 'pending-review' | 'active' | 'rejected';
 
-export type ModuleId = 'hair-assets' | 'outfit-assets' | 'base-assets' | 'pose-assets';
+export type ModuleId =
+  | 'hair-assets'
+  | 'outfit-assets'
+  | 'base-assets'
+  | 'pose-assets'
+  | 'face-accessories'
+  | 'piercings'
+  | 'makeup'
+  | 'emotions';
 
 export interface Campaign {
   id: string;
@@ -14,6 +22,10 @@ export interface Campaign {
   secondaryColor: string;
   accentColor: string;
   selectedModules: ModuleId[];
+  // map of module id -> selected asset ids (optional)
+  selectedAssets?: Partial<Record<ModuleId, string[]>>;
+  // selected branded asset ids (e.g. promo items) stored as strings
+  brandedAssets?: string[];
   status: CampaignStatus;
   createdAt: string; // ISO datetime string
 }
@@ -35,4 +47,6 @@ export interface ModuleOption {
   label: string;
   description: string;
   itemCount: number;
+  // optional small sample of assets for UI selection
+  sampleAssets?: { id: string | number; label: string }[];
 }
