@@ -52,6 +52,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <span className="sidebar__link-icon"><CampaignsIcon /></span>
             <span className="sidebar__link-label">Campaigns</span>
           </NavLink>
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) =>
+              `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
+            }
+            title="Dashboard"
+            onClick={onClose}
+          >
+            <span className="sidebar__link-icon"><CampaignsIcon /></span>
+            <span className="sidebar__link-label">Dashboard</span>
+          </NavLink>
         </nav>
       </aside>
     </>

@@ -1,8 +1,8 @@
 /* Design tokens — single source of truth for all CSS values */
 :root {
   /* Colors */
-  --color-primary: #435268;
-  --color-primary-hover: #344154;
+  --color-primary: #2aabe1;
+  --color-primary-hover: #1d95c7;
   --color-white: #ffffff;
   --color-bg: #f5f7fa;
   --color-background: #0D0D9B;

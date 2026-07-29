@@ -83,6 +83,7 @@
 
 .sidebar__link-label {
   overflow: hidden;
+  color: var(--color-black);
   text-overflow: ellipsis;
 }
 
