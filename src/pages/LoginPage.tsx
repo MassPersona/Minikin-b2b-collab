@@ -87,7 +87,7 @@ export function LoginPage() {
           {error && <p className="text-error" role="alert">{error}</p>}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-            <Link to="/">Back to home</Link>
+            {/* <Link to="/">Back to home</Link> */}
             <Button type="submit" variant="primary" loading={loading}>Login</Button>
           </div>
         </div>
