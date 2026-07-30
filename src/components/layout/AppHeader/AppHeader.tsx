@@ -1,5 +1,5 @@
 import { useAuth } from '../../../context/AuthContext';
-import LogoSvg from '../../../assets/Blue.png';
+import LogoSvg from '../../../assets/White.png';
 import './AppHeader.css';
 
 // Hamburger icon
