@@ -10,7 +10,7 @@ export function PublicHeader() {
     <header className="public-header">
       <div className="public-header__inner">
         <Link to="/" className="public-header__logo" aria-label="Minikin home">
-          <img src={LogoSvg} alt="Minikin" style={{ height: 80, width: 'auto' , paddingTop: 10}} />
+          <img src={LogoSvg} alt="Minikin" style={{ height: 100, width: 'auto' , paddingTop: 10}} />
         </Link>
         <nav className="public-header__nav" aria-label="Main navigation">
           <Button variant="primary" size="sm" onClick={() => navigate('/login')}>

@@ -1,4 +1,5 @@
 import { useAuth } from '../../../context/AuthContext';
+import LogoSvg from '../../../assets/Blue.png';
 import './AppHeader.css';
 
 // Hamburger icon
@@ -27,7 +28,7 @@ interface AppHeaderProps {
   onMenuToggle: () => void;
 }
 
-export function AppHeader({ pageTitle, onMenuToggle }: AppHeaderProps) {
+export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const { user, logout } = useAuth();
 
   return (
@@ -41,7 +42,9 @@ export function AppHeader({ pageTitle, onMenuToggle }: AppHeaderProps) {
         <HamburgerIcon />
       </button>
 
-      <h1 className="app-header__title">{pageTitle}</h1>
+      <img src={LogoSvg} alt="Minikin" style={{ height: 80, width: 'auto' }} />
+
+      <div style={{ flex: 1 }} />
 
       <div className="app-header__right">
         {user && (
