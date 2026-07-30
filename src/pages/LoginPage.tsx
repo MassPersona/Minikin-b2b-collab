@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
 import { FormFieldWrapper } from '../components/common/FormField';
@@ -9,11 +9,10 @@ import LogoImg from '../assets/Blue.png';
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
-    if (isAuthenticated) navigate('/campaigns', { replace: true });
+    if (isAuthenticated) navigate('/dashboard', { replace: true });
   }, [isAuthenticated, navigate]);
 
   const [email, setEmail] = useState('');
@@ -21,8 +20,6 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  interface LocationState { from?: { pathname?: string } }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -35,10 +32,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      // Redirect to intended page or dashboard
-    const state = (location.state as LocationState) ?? {};
-    const dest = state.from?.pathname ?? '/dashboard';
-      navigate(dest, { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       let message = 'Invalid credentials';
       if (err && typeof err === 'object') {

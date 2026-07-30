@@ -1,5 +1,4 @@
 import { NavLink } from 'react-router-dom';
-import LogoSvg from '../../../assets/white.png';
 import './Sidebar.css';
 
 // Inline SVG icon for Campaigns
