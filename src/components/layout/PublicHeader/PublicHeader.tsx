@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../common/Button';
-import LogoSvg from '../../../assets/white.png';
+import LogoSvg from '../../../assets/White.png';
 import './PublicHeader.css';
 
 export function PublicHeader() {
