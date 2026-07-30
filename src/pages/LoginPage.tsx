@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
 import { FormFieldWrapper } from '../components/common/FormField';
+import LogoImg from '../assets/Blue.png';
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth();
@@ -52,7 +53,7 @@ export function LoginPage() {
   return (
     <main style={{ maxWidth: 480, margin: '60px auto', padding: '0 16px' }}>
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <h2>Partner Login</h2>
+        <img src={LogoImg} alt="Minikin" style={{ height: 120, width: 'auto'}} />
         <p style={{ color: 'var(--color-text-secondary)' }}>Sign in to manage your brand campaigns</p>
       </div>
 
