@@ -1,365 +1,419 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AppLayout } from '../components/layout/AppLayout';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
-import { storageService } from '../services/storageService';
-import { MODULE_OPTIONS, BRANDED_ASSETS } from '../data/mockCampaigns';
-import type { Campaign, ModuleId } from '../types';
-
-// Mock products list (id, name, price)
-const PRODUCTS = [
-  { id: 0, name: 'Original Small', price: 25.0 },
-  { id: 1, name: 'Original Medium', price: 35.0 },
-  { id: 2, name: 'Original Large', price: 80.0 },
-  { id: 3, name: 'Bobblehead Small', price: 35.0 },
-  { id: 4, name: 'Bobblehead Medium', price: 45.0 },
-  { id: 5, name: 'Bobblehead Large', price: 90.0 },
-  { id: 6, name: 'Snow Globe Small', price: 125.0 },
-  { id: 7, name: 'Snow Globe Medium', price: 150.0 },
-  { id: 8, name: 'Snow Globe Large', price: 200.0 },
-  { id: 9, name: 'Original Small (Free)', price: 0.0 },
-  { id: 10, name: 'Original Medium (Free)', price: 0.0 },
-];
-
-// Note: module options are sourced from `MODULE_OPTIONS` in data/mockCampaigns
+import { campaignService, catalogService } from '../services/campaignService';
+import { useToast } from '../context/ToastContext';
+import type { CampaignType, CatalogProduct, CatalogAsset, CreateCampaignRequest } from '../types';
+import { BUNDLE_MENU_ITEMS } from '../types';
 
 function validateHex(hex: string) {
-  return /^#?[0-9A-Fa-f]{6}$/.test(hex);
+  return /^#[0-9A-Fa-f]{6}$/.test(hex);
 }
 
 export function CreateCampaignPage() {
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
-  // Modal for campaign type selection
+  // Catalog data from API
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [assets, setAssets] = useState<CatalogAsset[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+
+  useEffect(() => {
+    catalogService.getCatalog()
+      .then((data) => { setProducts(data.products); setAssets(data.assets); })
+      .catch((err) => addToast('error', err?.data?.message || 'Failed to load catalog'))
+      .finally(() => setCatalogLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Campaign type modal
   const [showTypeModal, setShowTypeModal] = useState(true);
-  const [campaignType, setCampaignType] = useState<string>('single');
+  const [campaignType, setCampaignType] = useState<CampaignType>('ProductFlowSingleUser');
 
+  // Form fields
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
+  const [isFreeShipping, setIsFreeShipping] = useState(false);
+  // Only for ProductFlowMultiUser
+  const [codeUsageLimit, setCodeUsageLimit] = useState<string>('');
+  // Only for ProductFlowSingleUser
+  const [numberOfCodesToGenerate, setNumberOfCodesToGenerate] = useState(1);
 
-  // Logo upload
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const logoFileRef = useRef<File | null>(null);
+  // Selections
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
+  const [selectedDefaultAssets, setSelectedDefaultAssets] = useState<number[]>([]);
+  const [selectedBundles, setSelectedBundles] = useState<string[]>([]);
+  const [assetFilter, setAssetFilter] = useState('');
+
+  const filteredAssets = assets.filter((a) =>
+    a.name.toLowerCase().includes(assetFilter.toLowerCase()) || String(a.id).includes(assetFilter)
+  );
 
   // Colors
-  const [primaryColor, setPrimaryColor] = useState('#435268');
-  const [secondaryColor, setSecondaryColor] = useState('#a78bfa');
-  const [accentColor, setAccentColor] = useState('#34d399');
+  const [color1, setColor1] = useState('#435268');
+  const [color2, setColor2] = useState('#a78bfa');
+  const [color3, setColor3] = useState('#34d399');
 
-  const [selectedModules, setSelectedModules] = useState<ModuleId[]>([]);
-  const [selectedAssets, setSelectedAssets] = useState<Partial<Record<ModuleId, string[]>>>({});
-  const [selectedBrandedAssets, setSelectedBrandedAssets] = useState<string[]>([]);
-
-  // (reserved) number of promo codes to generate if needed
+  // Logo file upload
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const productsOptions = PRODUCTS;
-
-  const toggleModule = useCallback((id: ModuleId) => {
-    setSelectedModules((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }, []);
-
-  const toggleAsset = useCallback((moduleId: ModuleId, assetId: string) => {
-    setSelectedAssets((prev) => {
-      const list = prev[moduleId] ?? [];
-      const next = list.includes(assetId) ? list.filter((x) => x !== assetId) : [...list, assetId];
-      return { ...prev, [moduleId]: next };
-    });
-  }, []);
-
   const toggleProduct = useCallback((id: number) => {
-    setSelectedProducts((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelectedProducts((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }, []);
 
-  const toggleBrandedAsset = useCallback((id: string) => {
-    setSelectedBrandedAssets((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleDefaultAsset = useCallback((id: number) => {
+    setSelectedDefaultAssets((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }, []);
 
-  const handleLogoChange = useCallback((file?: File) => {
-    if (!file) return;
-    const maxMB = 5;
-    if (file.size > maxMB * 1024 * 1024) {
-      setErrors((e) => ({ ...e, logo: 'File too large (max 5MB)' }));
-      return;
-    }
-    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
-    if (!allowed.includes(file.type)) {
-      setErrors((e) => ({ ...e, logo: 'Unsupported file type' }));
-      return;
-    }
-    logoFileRef.current = file;
-    const reader = new FileReader();
-    reader.onload = () => setLogoPreview(String(reader.result));
-    reader.readAsDataURL(file);
-    setErrors((e) => ({ ...e, logo: '' }));
+  const toggleBundle = useCallback((item: string) => {
+    setSelectedBundles((prev) => prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]);
   }, []);
-
-  const removeLogo = useCallback(() => {
-    logoFileRef.current = null;
-    setLogoPreview(null);
-  }, []);
-
-  // palette preview is rendered directly in the JSX using color swatches
 
   function validate() {
     const out: Record<string, string> = {};
     if (!name.trim()) out.name = 'Campaign name is required';
-    if (!description.trim()) out.description = 'Description is required';
     if (!startDate) out.startDate = 'Start date is required';
-    if (endDate && startDate && new Date(endDate) < new Date(startDate)) out.endDate = 'End date cannot be before start date';
-    if (selectedProducts.length === 0) out.products = 'Select at least one product';
-    if (selectedModules.length === 0) out.modules = 'Select at least one module';
-    if (!validateHex(primaryColor)) out.primaryColor = 'Invalid hex';
-    if (!validateHex(secondaryColor)) out.secondaryColor = 'Invalid hex';
-    if (!validateHex(accentColor)) out.accentColor = 'Invalid hex';
+    if (endDate && startDate && new Date(endDate) < new Date(startDate)) out.endDate = 'End date cannot be before start';
+    if (color1 && !validateHex(color1)) out.color1 = 'Invalid hex color';
+    if (color2 && !validateHex(color2)) out.color2 = 'Invalid hex color';
+    if (color3 && !validateHex(color3)) out.color3 = 'Invalid hex color';
+    if (campaignType === 'ProductFlowSingleUser' && numberOfCodesToGenerate < 1) out.codes = 'Must generate at least 1 code';
+    if (campaignType === 'ProductFlowMultiUser' && codeUsageLimit) {
+      const limit = parseInt(codeUsageLimit, 10);
+      if (isNaN(limit) || limit < 1 || limit > 1000000) out.codeUsageLimit = 'Must be between 1 and 1,000,000';
+    }
     setErrors(out);
     return Object.keys(out).length === 0;
   }
 
-  async function save(status: Campaign['status']) {
+  async function handleSubmit() {
     if (submitting) return;
-    if (!validate() && status !== 'draft') return;
+    if (!validate()) return;
     setSubmitting(true);
 
-    const campaign: Campaign = {
-      id: `camp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    const payload: CreateCampaignRequest = {
       name: name.trim(),
-      brandName: campaignType,
-      description: description.trim(),
-      startDate,
-      endDate,
-      logoPreview,
-      primaryColor,
-      secondaryColor,
-      accentColor,
-      selectedModules,
-      selectedAssets,
-      brandedAssets: selectedBrandedAssets,
-      status,
-      createdAt: new Date().toISOString(),
+      description: description.trim() || null,
+      type: campaignType,
+      startDate: new Date(startDate).toISOString(),
+      endDate: endDate ? new Date(endDate).toISOString() : null,
+      redeemableAmount: 0,
+      productIds: selectedProducts,
+      shopifyCollectionId: 'gid://shopify/Collection/304721526877',
+      tag: null,
+      isFreeShipping,
+      maxCodesPerUser: 1,
+      codeUsageLimit: campaignType === 'ProductFlowMultiUser' && codeUsageLimit ? parseInt(codeUsageLimit, 10) : null,
+      numberOfCodesToGenerate: campaignType === 'ProductFlowSingleUser' ? numberOfCodesToGenerate : 1,
+      defaultAssetItems: selectedDefaultAssets,
+      eligibleAssetItems: [],
+      unlockableMenuItems: selectedBundles,
+      logoURL: null,
+      color1: color1 || null,
+      color2: color2 || null,
+      color3: color3 || null,
     };
 
-    storageService.addCampaign(campaign);
-    setSubmitting(false);
-    // Simple success feedback — navigate back
-    navigate('/campaigns', { replace: true });
+    try {
+      await campaignService.create(payload, logoFile ?? undefined);
+      addToast('success', 'Campaign created successfully!');
+      navigate('/campaigns', { replace: true });
+    } catch (err: unknown) {
+      const e = err as { data?: { message?: string } };
+      addToast('error', e?.data?.message || 'Failed to create campaign');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  return (
-    <AppLayout>
-      <div className="page-container">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2 className="section-title">Create Campaign</h2>
-            <p className="section-subtitle">Choose a type and fill campaign details</p>
-          </div>
-        </header>
+  const typeOptions: { value: CampaignType; label: string; desc: string }[] = [
+    { value: 'ProductFlowSingleUser', label: 'Single User', desc: 'One unique code per user. Codes are generated upfront.' },
+    { value: 'ProductFlowMultiUser', label: 'Multi User', desc: 'Shared code that multiple users can redeem.' },
+    { value: 'AssetOnly', label: 'Asset Only', desc: 'Unlock digital assets only.' },
+  ];
 
-        {/* Type modal */}
-        {showTypeModal && (
-          <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.4)' }}>
-            <div style={{ width: 920, maxWidth: '95%' }}>
-              <Card padding="md">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={{ margin: 0 }}>Choose Campaign Type</h3>
-                <button aria-label="Close type modal" onClick={() => setShowTypeModal(false)} style={{ background: 'transparent' }}>✕</button>
-              </div>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                <div style={{ flex: 1, border: '1px solid var(--color-border)', padding: 16, borderRadius: 8 }}>
-                  <h4>Single User</h4>
-                  <p className="text-secondary">One code per user.</p>
-                  <Button variant={campaignType === 'single' ? 'primary' : 'ghost'} onClick={() => setCampaignType('single')}>Select</Button>
-                </div>
-                <div style={{ flex: 1, border: '1px solid var(--color-border)', padding: 16, borderRadius: 8 }}>
-                  <h4>Multi User</h4>
-                  <p className="text-secondary">Shared code for multiple users.</p>
-                  <Button variant={campaignType === 'multi' ? 'primary' : 'ghost'} onClick={() => setCampaignType('multi')}>Select</Button>
-                </div>
-                <div style={{ flex: 1, border: '1px solid var(--color-border)', padding: 16, borderRadius: 8 }}>
-                  <h4>Asset Only</h4>
-                  <p className="text-secondary">Unlock assets only.</p>
-                  <Button variant={campaignType === 'asset' ? 'primary' : 'ghost'} onClick={() => setCampaignType('asset')}>Select</Button>
-                </div>
+  return (
+    <div className="page-container">
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/campaigns')}>← Back</Button>
+          <h2 className="section-title" style={{ marginTop: 8 }}>Create Campaign</h2>
+          <p className="section-subtitle">Fill in the details below to launch a new campaign</p>
+        </div>
+      </header>
+
+      {/* Type selection modal */}
+      {showTypeModal && (
+        <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 1000 }}>
+          <div style={{ width: 680, maxWidth: '95%' }}>
+            <Card padding="md">
+              <h3 style={{ margin: '0 0 16px' }}>Select Campaign Type</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+                {typeOptions.map((opt) => (
+                  <div
+                    key={opt.value}
+                    onClick={() => setCampaignType(opt.value)}
+                    style={{
+                      border: campaignType === opt.value ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                      padding: 16, borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s',
+                      background: campaignType === opt.value ? 'rgba(42,171,225,0.04)' : 'transparent',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>{opt.label}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{opt.desc}</div>
+                  </div>
+                ))}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <Button variant="ghost" onClick={() => setShowTypeModal(false)}>Cancel</Button>
-                <Button variant="primary" onClick={() => setShowTypeModal(false)}>Create This Type</Button>
+                <Button variant="ghost" onClick={() => { setShowTypeModal(false); navigate('/campaigns'); }}>Cancel</Button>
+                <Button variant="primary" onClick={() => setShowTypeModal(false)}>Continue</Button>
               </div>
-              </Card>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {catalogLoading ? (
+        <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-secondary)' }}>Loading catalog...</div>
+      ) : (
+        <form onSubmit={(e) => e.preventDefault()}>
+          <div style={{ display: 'grid', gap: 20 }}>
+
+            {/* Basic Info */}
+            <Card padding="md">
+              <h4 style={{ marginTop: 0, marginBottom: 16 }}>Basic Information</h4>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: 4 }}>Campaign Name *</label>
+                  <input style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                    value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer 2026 Promo" maxLength={255} />
+                  {errors.name && <div className="text-error" style={{ fontSize: '0.8rem', marginTop: 4 }}>{errors.name}</div>}
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: 4 }}>Description</label>
+                  <textarea style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', minHeight: 80, resize: 'vertical' }}
+                    value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief campaign description..." maxLength={2000} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: 4 }}>Start Date *</label>
+                    <input type="date" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                      value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    {errors.startDate && <div className="text-error" style={{ fontSize: '0.8rem', marginTop: 4 }}>{errors.startDate}</div>}
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: 4 }}>End Date</label>
+                    <input type="date" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                      value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    {errors.endDate && <div className="text-error" style={{ fontSize: '0.8rem', marginTop: 4 }}>{errors.endDate}</div>}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Codes & Shipping */}
+            <Card padding="md">
+              <h4 style={{ marginTop: 0, marginBottom: 16 }}>Codes & Shipping</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {campaignType === 'ProductFlowSingleUser' && (
+                  <div>
+                    <label style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: 4 }}>Number of Codes to Generate *</label>
+                    <input type="number" min={1} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                      value={numberOfCodesToGenerate} onChange={(e) => setNumberOfCodesToGenerate(parseInt(e.target.value) || 1)} />
+                    {errors.codes && <div className="text-error" style={{ fontSize: '0.8rem', marginTop: 4 }}>{errors.codes}</div>}
+                  </div>
+                )}
+                {campaignType === 'ProductFlowMultiUser' && (
+                  <div>
+                    <label style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: 4 }}>Code Usage Limit *</label>
+                    <input type="number" min={1} max={1000000} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                      value={codeUsageLimit} onChange={(e) => setCodeUsageLimit(e.target.value)} placeholder="1 – 1,000,000" />
+                    {errors.codeUsageLimit && <div className="text-error" style={{ fontSize: '0.8rem', marginTop: 4 }}>{errors.codeUsageLimit}</div>}
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: campaignType === 'AssetOnly' ? 0 : 24 }}>
+                  <input type="checkbox" id="freeShipping" checked={isFreeShipping} onChange={(e) => setIsFreeShipping(e.target.checked)} />
+                  <label htmlFor="freeShipping" style={{ fontWeight: 600, fontSize: '0.9rem' }}>Free Shipping</label>
+                </div>
+              </div>
+            </Card>
+
+            {/* Products */}
+            <Card padding="md">
+              <h4 style={{ marginTop: 0, marginBottom: 12 }}>Products</h4>
+              <p className="text-secondary" style={{ fontSize: '0.85rem', marginBottom: 12 }}>Select products to include in this campaign</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                {products.map((p) => (
+                  <label key={p.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                    border: selectedProducts.includes(p.id) ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    borderRadius: 8, cursor: 'pointer', transition: 'border 0.15s',
+                  }}>
+                    <input type="checkbox" checked={selectedProducts.includes(p.id)} onChange={() => toggleProduct(p.id)} />
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{p.name}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{p.currency} {p.price.toFixed(2)}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </Card>
+
+            {/* Bundles */}
+            <Card padding="md">
+              <h4 style={{ marginTop: 0, marginBottom: 12 }}>Bundles (Unlockable Menu Items)</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {BUNDLE_MENU_ITEMS.map((item) => (
+                  <label key={item} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
+                    border: selectedBundles.includes(item) ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-full)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500,
+                    background: selectedBundles.includes(item) ? 'rgba(42,171,225,0.06)' : 'transparent',
+                  }}>
+                    <input type="checkbox" checked={selectedBundles.includes(item)} onChange={() => toggleBundle(item)} style={{ display: 'none' }} />
+                    {item}
+                  </label>
+                ))}
+              </div>
+            </Card>
+
+            {/* Assets */}
+            <Card padding="md">
+              <h4 style={{ marginTop: 0, marginBottom: 12 }}>Default Assets</h4>
+              <p className="text-secondary" style={{ fontSize: '0.85rem', marginBottom: 12 }}>Select default assets to include in this campaign</p>
+              <input
+                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', marginBottom: 12 }}
+                placeholder="Search assets..."
+                onChange={(e) => setAssetFilter(e.target.value)}
+              />
+              <div style={{ maxHeight: 360, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                {filteredAssets.map((a) => {
+                  const selected = selectedDefaultAssets.includes(a.id);
+                  return (
+                    <label key={a.id} style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 10,
+                      border: selected ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                      borderRadius: 8, cursor: 'pointer', transition: 'border 0.15s',
+                      background: selected ? 'rgba(42,171,225,0.04)' : 'transparent',
+                    }}>
+                      <input type="checkbox" checked={selected} onChange={() => toggleDefaultAsset(a.id)} style={{ display: 'none' }} />
+                      {a.iconUrl ? (
+                        <img src={a.iconUrl} alt={a.name} style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 6 }} />
+                      ) : (
+                        <div style={{ width: 48, height: 48, background: 'var(--color-bg)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--color-text-secondary)' }}>No img</div>
+                      )}
+                      <span style={{ fontSize: '0.8rem', fontWeight: 500, textAlign: 'center', lineHeight: 1.2 }}>{a.name}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>#{a.id}</span>
+                    </label>
+                  );
+                })}
+                {filteredAssets.length === 0 && <div className="text-secondary" style={{ gridColumn: '1 / -1', padding: 12 }}>No assets match your search</div>}
+              </div>
+            </Card>
+
+            {/* Branding */}
+            <Card padding="md">
+              <h4 style={{ marginTop: 0, marginBottom: 16 }}>Branding</h4>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem', display: 'block', marginBottom: 4 }}>Campaign Logo (512×512, max 5MB)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo preview" style={{ width: 80, height: 80, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--color-border)' }} />
+                  ) : (
+                    <div style={{ width: 80, height: 80, background: 'var(--color-bg)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', fontSize: '0.75rem', border: '1px dashed var(--color-border)' }}>512×512</div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setLogoError('');
+                      if (file.size > 5 * 1024 * 1024) { setLogoError('File must be less than 5MB'); return; }
+                      const img = new Image();
+                      img.onload = () => {
+                        // Resize to 512×512 using canvas
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 512;
+                        canvas.height = 512;
+                        const ctx = canvas.getContext('2d')!;
+                        // Fill white background
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, 512, 512);
+                        // Calculate fit (maintain aspect ratio, center)
+                        const scale = Math.min(512 / img.width, 512 / img.height);
+                        const w = img.width * scale;
+                        const h = img.height * scale;
+                        const x = (512 - w) / 2;
+                        const y = (512 - h) / 2;
+                        ctx.drawImage(img, x, y, w, h);
+                        URL.revokeObjectURL(img.src);
+                        canvas.toBlob((blob) => {
+                          if (!blob) { setLogoError('Failed to process image'); return; }
+                          const resizedFile = new File([blob], file.name, { type: 'image/png' });
+                          setLogoFile(resizedFile);
+                          setLogoPreview(URL.createObjectURL(resizedFile));
+                        }, 'image/png');
+                      };
+                      img.onerror = () => setLogoError('Invalid image file');
+                      img.src = URL.createObjectURL(file);
+                    }} />
+                    {logoFile && <button type="button" onClick={() => { setLogoFile(null); setLogoPreview(null); }} style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'left' }}>Remove</button>}
+                    {logoError && <div className="text-error" style={{ fontSize: '0.8rem' }}>{logoError}</div>}
+                    <div className="text-secondary" style={{ fontSize: '0.8rem' }}>PNG or JPG, max 5MB. For best results, upload a 512×512px image.</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: 4 }}>Color 1</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="color" value={color1} onChange={(e) => setColor1(e.target.value)} style={{ width: 36, height: 36, border: 'none', cursor: 'pointer' }} />
+                    <input value={color1} onChange={(e) => setColor1(e.target.value)} style={{ width: 90, padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontFamily: 'monospace', fontSize: '0.8rem' }} />
+                  </div>
+                  {errors.color1 && <div className="text-error" style={{ fontSize: '0.75rem' }}>{errors.color1}</div>}
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: 4 }}>Color 2</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="color" value={color2} onChange={(e) => setColor2(e.target.value)} style={{ width: 36, height: 36, border: 'none', cursor: 'pointer' }} />
+                    <input value={color2} onChange={(e) => setColor2(e.target.value)} style={{ width: 90, padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontFamily: 'monospace', fontSize: '0.8rem' }} />
+                  </div>
+                  {errors.color2 && <div className="text-error" style={{ fontSize: '0.75rem' }}>{errors.color2}</div>}
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: 4 }}>Color 3</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input type="color" value={color3} onChange={(e) => setColor3(e.target.value)} style={{ width: 36, height: 36, border: 'none', cursor: 'pointer' }} />
+                    <input value={color3} onChange={(e) => setColor3(e.target.value)} style={{ width: 90, padding: '6px 8px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontFamily: 'monospace', fontSize: '0.8rem' }} />
+                  </div>
+                  {errors.color3 && <div className="text-error" style={{ fontSize: '0.75rem' }}>{errors.color3}</div>}
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                  <div style={{ width: 36, height: 36, background: color1, borderRadius: 6, border: '1px solid var(--color-border)' }} />
+                  <div style={{ width: 36, height: 36, background: color2, borderRadius: 6, border: '1px solid var(--color-border)' }} />
+                  <div style={{ width: 36, height: 36, background: color3, borderRadius: 6, border: '1px solid var(--color-border)' }} />
+                </div>
+              </div>
+            </Card>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '8px 0 24px' }}>
+              <Button variant="ghost" onClick={() => navigate('/campaigns')}>Cancel</Button>
+              <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+                {submitting ? 'Creating...' : 'Create Campaign'}
+              </Button>
             </div>
           </div>
-        )}
-
-        <form onSubmit={(e) => e.preventDefault()}>
-          <section style={{ display: 'grid', gap: 16, marginTop: 16 }}>
-            <Card padding="md">
-              <div style={{ display: 'grid', gap: 12 }}>
-                <label>
-                  <div style={{ fontWeight: 600 }}>Campaign name</div>
-                  <input value={name} onChange={(e) => setName(e.target.value)} />
-                  {errors.name && <div className="text-error">{errors.name}</div>}
-                </label>
-
-                <label>
-                  <div style={{ fontWeight: 600 }}>Description</div>
-                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-                  {errors.description && <div className="text-error">{errors.description}</div>}
-                </label>
-
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <label style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600 }}>Start date</div>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                    {errors.startDate && <div className="text-error">{errors.startDate}</div>}
-                  </label>
-                  <label style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600 }}>End date</div>
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                    {errors.endDate && <div className="text-error">{errors.endDate}</div>}
-                  </label>
-                </div>
-
-                <div>
-                  <div style={{ fontWeight: 600 }}>Products</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, marginTop: 8 }}>
-                    {productsOptions.map((p) => (
-                      <label key={p.id} style={{ border: '1px solid var(--color-border)', padding: 8, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input type="checkbox" checked={selectedProducts.includes(p.id)} onChange={() => toggleProduct(p.id)} />
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{p.name}</div>
-                          <div className="text-secondary">${p.price.toFixed(2)}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  {errors.products && <div className="text-error">{errors.products}</div>}
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="md">
-              <div style={{ display: 'grid', gap: 12 }}>
-                <div style={{ fontWeight: 600 }}>Brand Logo</div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  {logoPreview ? (
-                    <img src={logoPreview} alt="Logo preview" style={{ width: 96, height: 96, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--color-border)' }} />
-                  ) : (
-                    <div style={{ width: 96, height: 96, background: 'var(--color-bg)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>96x96</div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <input id="logo-file" type="file" accept="image/png,image/jpeg,image/jpg,image/svg+xml" onChange={(e) => handleLogoChange(e.target.files?.[0])} />
-                    {logoPreview && <Button variant="ghost" onClick={removeLogo}>Remove</Button>}
-                    {errors.logo && <div className="text-error">{errors.logo}</div>}
-                    <div className="text-secondary text-sm">PNG, JPG, SVG — max 5MB. (Preview only)</div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="md">
-              <div style={{ display: 'grid', gap: 12 }}>
-                <div style={{ fontWeight: 600 }}>Brand Colors</div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label className="text-sm">Primary</label>
-                    <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} />
-                    <input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} />
-                    {errors.primaryColor && <div className="text-error">{errors.primaryColor}</div>}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label className="text-sm">Secondary</label>
-                    <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} />
-                    <input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} />
-                    {errors.secondaryColor && <div className="text-error">{errors.secondaryColor}</div>}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label className="text-sm">Accent</label>
-                    <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} />
-                    <input value={accentColor} onChange={(e) => setAccentColor(e.target.value)} />
-                    {errors.accentColor && <div className="text-error">{errors.accentColor}</div>}
-                  </div>
-
-                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                    <div style={{ width: 40, height: 40, background: primaryColor, borderRadius: 6 }} />
-                    <div style={{ width: 40, height: 40, background: secondaryColor, borderRadius: 6 }} />
-                    <div style={{ width: 40, height: 40, background: accentColor, borderRadius: 6 }} />
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="md">
-              <div style={{ display: 'grid', gap: 12 }}>
-                <div style={{ fontWeight: 600 }}>Bundles</div>
-                <div style={{ fontSize: '0.95rem' }} className="text-secondary">Choose bundles and optionally pick specific asset IDs for each selected bundle.</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
-                  {MODULE_OPTIONS.map((opt) => {
-                    const isSelected = selectedModules.includes(opt.id);
-                    const chosen = selectedAssets[opt.id] ?? [];
-                    return (
-                      <div key={opt.id} style={{ border: '1px solid var(--color-border)', padding: 12, borderRadius: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{opt.label}</div>
-                            <div className="text-secondary" style={{ fontSize: '0.9rem' }}>{opt.description}</div>
-                          </div>
-                          <input aria-label={`select bundle ${opt.label}`} type="checkbox" checked={isSelected} onChange={() => toggleModule(opt.id)} />
-                        </div>
-
-                                {isSelected && opt.sampleAssets && (
-                                  <div style={{ marginTop: 10 }}>
-                                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Select asset IDs</div>
-                                    <div style={{ display: 'grid', gap: 6 }}>
-                                      {opt.sampleAssets.map((asset) => {
-                                        const assetId = String(asset.id);
-                                        return (
-                                          <label key={assetId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <input type="checkbox" checked={chosen.includes(assetId)} onChange={() => toggleAsset(opt.id, assetId)} />
-                                            <span className="text-mono">[{assetId}] {asset.label}</span>
-                                          </label>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                      </div>
-                    );
-                  })}
-                </div>
-                {errors.modules && <div className="text-error">{errors.modules}</div>}
-              </div>
-            </Card>
-
-              <Card padding="md">
-                <div style={{ display: 'grid', gap: 12 }}>
-                  <div style={{ fontWeight: 600 }}>Branded Assets</div>
-                  <div className="text-secondary">Pick branded assets to include in the campaign (multi-select)</div>
-                  <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-                    {BRANDED_ASSETS.map((a) => (
-                      <label key={String(a.id)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input type="checkbox" checked={selectedBrandedAssets.includes(String(a.id))} onChange={() => toggleBrandedAsset(String(a.id))} />
-                        <span className="text-mono">[{a.id}]</span>
-                        <span>{a.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <Button variant="ghost" onClick={() => navigate('/campaigns')}>Cancel</Button>
-              <Button variant="secondary" onClick={() => save('draft')}>Save as Draft</Button>
-              <Button variant="primary" onClick={() => save('pending-review')}>Submit Campaign</Button>
-            </div>
-          </section>
         </form>
-      </div>
-    </AppLayout>
+      )}
+    </div>
   );
 }
