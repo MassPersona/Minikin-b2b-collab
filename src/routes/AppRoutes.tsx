@@ -6,6 +6,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { CampaignsPage } from '../pages/CampaignsPage';
 import { CreateCampaignPage } from '../pages/CreateCampaignPage';
+import { EditCampaignPage } from '../pages/EditCampaignPage';
 import { CampaignDetailsPage } from '../pages/CampaignDetailsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
@@ -54,6 +55,17 @@ export function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <CampaignDetailsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/campaigns/:campaignId/edit"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <EditCampaignPage />
             </AppLayout>
           </ProtectedRoute>
         }

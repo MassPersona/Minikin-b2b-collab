@@ -47,6 +47,7 @@ export function CampaignDetailsPage() {
   const { addToast } = useToast();
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'codes' | 'redemptions'>('details');
 
   useEffect(() => {
@@ -92,6 +93,22 @@ export function CampaignDetailsPage() {
           }}>
             {campaign.isActive ? 'Active' : 'Inactive'}
           </span>
+          <Button variant="secondary" size="sm" onClick={() => navigate(`/campaigns/${campaignId}/edit`)}>Edit</Button>
+          <Button variant="ghost" size="sm" disabled={deleting} onClick={async () => {
+            if (!confirm('Are you sure you want to delete this campaign? This cannot be undone.')) return;
+            setDeleting(true);
+            try {
+              await campaignService.delete(campaignId!);
+              addToast('success', 'Campaign deleted');
+              navigate('/campaigns', { replace: true });
+            } catch (err: unknown) {
+              const e = err as { data?: { message?: string } };
+              addToast('error', e?.data?.message || 'Failed to delete campaign');
+              setDeleting(false);
+            }
+          }}>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
         </div>
       </header>
 
